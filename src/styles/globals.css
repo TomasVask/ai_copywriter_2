@@ -1,0 +1,47 @@
+@import "tailwindcss";
+
+@theme{
+ --color-background: rgb(250, 250, 250);
+  --color-foreground: rgb(30, 27, 25);
+
+  --color-card: rgb(255, 255, 255);
+  --color-card-foreground: rgb(30, 27, 25);
+
+  --color-popover: rgb(255, 255, 255);
+  --color-popover-foreground: rgb(30, 27, 25);
+
+  --color-primary: rgb(29, 100, 255);
+  --color-primary-foreground: rgb(255, 255, 255);
+
+  --color-secondary: rgb(244, 245, 246);
+  --color-secondary-foreground: rgb(42, 47, 56);
+
+  --color-muted: rgb(244, 245, 246);
+  --color-muted-foreground: rgb(106, 112, 123);
+
+  --color-accent: rgb(29, 37, 55);
+  --color-accent-foreground: rgb(241, 245, 255);
+
+  --color-destructive: rgb(255, 72, 87);
+  --color-destructive-foreground: rgb(241, 245, 255);
+
+  --color-border: rgb(232, 234, 237);
+  --color-input: rgb(232, 234, 237);
+  --color-ring: rgb(29, 100, 255);
+
+  --radius: 0.5rem;
+
+  --color-sidebar-background: rgb(29, 37, 55);
+  --color-sidebar-foreground: rgb(241, 245, 255);
+  --color-sidebar-primary: rgb(29, 100, 255);
+  --color-sidebar-primary-foreground: rgb(255, 255, 255);
+  --color-sidebar-accent: rgb(244, 245, 246);
+  --color-sidebar-accent-foreground: rgb(42, 47, 56);
+  --color-sidebar-border: rgb(29, 37, 55);
+  --color-sidebar-ring: rgb(29, 100, 255);
+      }
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+}

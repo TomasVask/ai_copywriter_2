@@ -1,0 +1,1 @@
+export type PromptStrategyKey = 'chainOfThought' | 'selfRefinement' | 'maieutic';
