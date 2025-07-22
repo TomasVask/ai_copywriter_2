@@ -141,41 +141,27 @@ copywriter_ai/
    If augmentation is needed, it calls KB retrieval tool and web-search tool. 
    Web-search tool has its own flow where idea is to scrape content from single link. Priority is url link of concrete service of company, if not, then it scrapes list of services titles and returns a list.
 
-__start__
-   |
-   v
-queryOrRespond
-   |
-   +--------------------------------+
-   |                                |
-   | (if tools needed)              | (no tools needed)
-   v                                v
-tools                            __end__
-   |
-   +--------------------------------+
-   |                                |
-webSearchTool                     retrieveTool
-   |                                
-   v                                
-filterServiceLinkFromSearch
-   |
-   +--------------------------------+
-   |                                |
-   | (if home link)                 | (if service link)
-   v                                v
-scrapeLinksFromHomePage          scrapeServiceContent
-   |                                |
-   v                                v
-filterServiceHomeLinkFromHome     __end__
-   |                               
-   v                               
-scrapeServiceContent              
-   |                               
-   v                               
-filterServiceTitlesFromScrappedContent
-   |
-   v
-__end__
+```mermaid
+flowchart TD
+    A[__start__] --> B[queryOrRespond]
+    B -->|if tools needed| C[tools]
+    B -->|no tools needed| Z[__end__]
+
+    C --> D[webSearchTool]
+    C --> E[retrieveTool]
+
+    D --> F[filterServiceLinkFromSearch]
+
+    F -->|if home link| G[scrapeLinksFromHomePage]
+    F -->|if service link| H[scrapeServiceContent]
+
+    G --> I[filterServiceHomeLinkFromHome]
+    I --> J[scrapeServiceContent]
+
+    J --> K[filterServiceTitlesFromScrappedContent]
+    H --> Z
+    K --> Z
+```
 
 ## Creation Graph
    Once augmentation is finished, or not performed at all, creation graphs take over. 
@@ -185,27 +171,24 @@ __end__
 ```mermaid
 flowchart TD
   subgraph OpenAI
-    A1[__start__] --> A2[ran augment.]
-    A2 --> A3[createTaskSummary]
-    A2 --> A4[generateAd]
-    A4 --> A5[generateAd]
-    A5 --> A6[__end__]
+    A1[__start__] --> A2[ran augment.?]
+    A2 -- yes --> A3[createTaskSummary] --> A4[generateAd]
+    A2 -- no --> A4
+    A4 --> A5[__end__]
   end
 
   subgraph Claude
-    B1[__start__] --> B2[ran augment.]
-    B2 --> B3[createTaskSummary]
-    B2 --> B4[generateAd]
-    B4 --> B5[generateAd]
-    B5 --> B6[__end__]
+    B1[__start__] --> B2[ran augment.?]
+    B2 -- yes --> B3[createTaskSummary] --> B4[generateAd]
+    B2 -- no --> B4
+    B4 --> B5[__end__]
   end
 
   subgraph Gemini
-    C1[__start__] --> C2[ran augment.]
-    C2 --> C3[createTaskSummary]
-    C2 --> C4[generateAd]
-    C4 --> C5[generateAd]
-    C5 --> C6[__end__]
+    C1[__start__] --> C2[ran augment.?]
+    C2 -- yes --> C3[createTaskSummary] --> C4[generateAd]
+    C2 -- no --> C4
+    C4 --> C5[__end__]
   end
 ```
 
