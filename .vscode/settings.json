@@ -45,5 +45,5 @@
     "\\bclass(?:Name)?\\s*=\\s*[\"'`]([^\"'`]*)[\"'`]", // Default class detection
     "\\b[A-Za-z0-9_]*[Cc]lass[A-Za-z0-9_]*\\s*=\\s*[\"'`]([^\"'`]*)[\"'`]", // Matches any property containing "class"
     "\\b[A-Za-z0-9_]*[Ss]tyle[A-Za-z0-9_]*\\s*=\\s*[\"'`]([^\"'`]*)[\"'`]" // Matches any property containing "style"
-  ]
+  ],
 }

@@ -182,23 +182,32 @@ __end__
    One graph is run per each active model. If augmentation was performed, then graph run taskSummary function to create a task for itself with combined user prompt and all contextual information. Then it runs ad generation.
    Ad generation also covers any other random response should user prompt be random.
 
-            Model: OpenAI                  Model: Claude                   Model: Gemini
-                 |                              |                               |
-                 v                              v                               v
-             __start__                      __start__                       __start__
-                 |                              |                               |
-         +----------------+           +----------------+              +----------------+
-         |                |           |                |              |                |
-         | ran augment.   |           | ran augment.   |              | ran augment.   |
-         |                |           |                |              |                |
-         v                v           v                v              v                v
-   createTaskSummary   generateAd  createTaskSummary generateAd  createTaskSummary generateAd
-         |                |           |                |              |                |
-         v                |           v                |              v                |
-     generateAd <---------+       generateAd <---------+          generateAd <---------+
-         |                              |                               |
-         v                              v                               v
-      __end__                        __end__                         __end__
+```mermaid
+flowchart TD
+  subgraph OpenAI
+    A1[__start__] --> A2[ran augment.]
+    A2 --> A3[createTaskSummary]
+    A2 --> A4[generateAd]
+    A4 --> A5[generateAd]
+    A5 --> A6[__end__]
+  end
+
+  subgraph Claude
+    B1[__start__] --> B2[ran augment.]
+    B2 --> B3[createTaskSummary]
+    B2 --> B4[generateAd]
+    B4 --> B5[generateAd]
+    B5 --> B6[__end__]
+  end
+
+  subgraph Gemini
+    C1[__start__] --> C2[ran augment.]
+    C2 --> C3[createTaskSummary]
+    C2 --> C4[generateAd]
+    C4 --> C5[generateAd]
+    C5 --> C6[__end__]
+  end
+```
 
 ---
 
