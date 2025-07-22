@@ -6,7 +6,7 @@ import { Message } from "@/models/message.model";
 import { ChatSession } from "@/models/chatSession.model";
 import { LargeLanguageModel } from "@/models/largeLanguageModel.model";
 import { useChatStore } from "@/store/chatStore";
-import { sendChatMessageToRagApi } from "@/services/rag/ragApiRequest";
+import { sendChatMessageToRagApi } from "@/services/chatApiRequest";
 import { ModelResponseAction } from "@/enums/modelResponseAction.enum";
 import { GraphStep } from "@/enums/graphStep.enum";
 
@@ -115,6 +115,28 @@ export default function Home() {
           updateAssistantMessageProperty("scrapedServiceContent", content, assistantMessage);
         }
 
+        if (type === GraphStep.Error && !model) {
+          const currentSessionValue = useChatStore.getState().currentSession;
+          if (!currentSessionValue) return;
+
+          const updatedMessages = currentSessionValue.messages.map((msg) => {
+            if (msg.id === assistantMessage.id) {
+              const updatedResponses = (msg.responses || []).map(response => ({
+                ...response,
+                error: content,
+                loading: false,
+              }));
+              return { ...msg, responses: updatedResponses };
+            }
+            return msg;
+          });
+
+          setCurrentSession({ ...currentSessionValue, messages: updatedMessages });
+          updateChatHistory(currentSessionValue.id, updatedMessages);
+        }
+
+
+
         if ((type === GraphStep.TaskSummary || type === GraphStep.GenerateAd || type === GraphStep.Error) && model) {
           const currentSessionValue = useChatStore.getState().currentSession;
           if (!currentSessionValue) return;
@@ -123,7 +145,7 @@ export default function Home() {
             if (msg.id === assistantMessage.id) {
               // Find the current model's response
               const existingResponses = msg.responses || [];
-              const modelResponseIndex = existingResponses.findIndex(r => r.model === model);
+              const modelResponseIndex = existingResponses.findIndex(response => response.model === model);
 
               if (modelResponseIndex >= 0) {
                 // Update existing model response
@@ -156,6 +178,7 @@ export default function Home() {
             }
             return msg;
           });
+          console.log("Updated messages:", updatedMessages);
 
           setCurrentSession({ ...currentSessionValue, messages: updatedMessages });
           updateChatHistory(currentSessionValue.id, updatedMessages);
@@ -168,8 +191,8 @@ export default function Home() {
 
       const updatedMessages = currentSessionValue.messages.map((msg) => {
         if (msg.id === assistantMessage.id) {
-          const erroredResponses = (msg.responses || []).map(r => ({
-            ...r,
+          const erroredResponses = (msg.responses || []).map(response => ({
+            ...response,
             generatedContent: "",
             error: error instanceof Error ? error.message : String(error),
             loading: false,
@@ -213,11 +236,11 @@ export default function Home() {
       .map(msg => {
         if (msg.role === "assistant") {
           const modelResponses = (msg.responses || [])
-            .filter(r =>
-              models.includes(r.model) &&
-              r.generatedContent &&
-              typeof r.generatedContent === "string" &&
-              r.generatedContent.trim() !== ""
+            .filter(response =>
+              models.includes(response.model) &&
+              response.generatedContent &&
+              typeof response.generatedContent === "string" &&
+              response.generatedContent.trim() !== ""
             );
 
           if (modelResponses.length > 0) {

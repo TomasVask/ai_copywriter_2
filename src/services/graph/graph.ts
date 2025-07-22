@@ -1,8 +1,8 @@
 import { ChatOpenAI, ChatOpenAICallOptions } from "@langchain/openai";
 import { Annotation, StateGraph } from "@langchain/langgraph";
 import { AIMessage, HumanMessage, SystemMessage } from "@langchain/core/messages";
-import { retrieveTool, webSearchTool, augmentToolNode, scrapeContentFromLinks, extractLinksFromHomePage } from "./ragTools";
-import { augmentationSystemPrompt, createTaskSummaryPrompt, extractServicesFromScrappedContentPrompt, filterLinksFromHomePrompt, filterLinksFromSearchPrompt, generateAdPrompt } from "@/system_prompts/system_prompts";
+import { retrieveTool, webSearchTool, augmentToolNode, scrapeServiceContent, scrapeLinksFromHomePage } from "./graphTools";
+import { augmentationSystemPrompt, createTaskSummaryPrompt, filterServiceTitlesFromScrappedContentPrompt, filterServicesHomeLinkFromHomepagePrompt, filterLinkFromSearchPrompt, generateAdPrompt } from "@/system_prompts/system_prompts";
 import { toolsCondition } from "@langchain/langgraph/prebuilt";
 import { extractStringContent, handleModelError, toLangChainMessagesForAugmentation, toLangChainMessagesForCreation } from "@/utils/utils";
 import { Message } from "@/models/message.model";
@@ -13,6 +13,8 @@ import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { GraphStep } from "@/enums/graphStep.enum";
 import { StepStreamData } from "@/models/stepStreamData.model";
 import { CustomFunction } from "@/enums/customFunction.enum";
+import { useSettingsStore } from "@/store/settingsStore";
+import { checkRateLimit } from "../rateLimitCheck";
 
 const retrievalOrchestrator = new ChatOpenAI({
   model: "gpt-4.1",
@@ -37,7 +39,7 @@ export const StateAnnotation = Annotation.Root({
   filteredLinkAfterHomePage: Annotation<string[]>(),
   linksUsedForScraping: Annotation<string[]>(),
   scrapedServiceContent: Annotation<string>(),
-  scrapedServices: Annotation<string[]>(),
+  scrapedServices: Annotation<string>(),
   branch: Annotation<string>(),
 });
 
@@ -83,7 +85,7 @@ async function filterLinksWithPicker(
     } else {
       contentStr = JSON.stringify(response.content);
     }
-    console.log('filterLinksWithPicker finished')
+    console.log('filterLinksWithPicker finished', contentStr)
     return { [resultKey]: contentStr ? JSON.parse(contentStr) : [] };
   } catch (error) {
     const errorMessage = String(error);
@@ -91,37 +93,32 @@ async function filterLinksWithPicker(
   }
 }
 
-async function filterServiceLinksFromSearch(state: typeof StateAnnotation.State) {
-  console.log('filterServiceLinksFromSearch started')
+async function filterServiceLinkFromSearch(state: typeof StateAnnotation.State) {
+  console.log('filterServiceLinkFromSearch started')
   const lastResultOfSearch = state.messages[state.messages.length - 1];
   const linksFromSearch = lastResultOfSearch.content;
-  return filterLinksWithPicker(linksFromSearch, filterLinksFromSearchPrompt, "filteredLinkAfterSearch");
+  return filterLinksWithPicker(linksFromSearch, filterLinkFromSearchPrompt, "filteredLinkAfterSearch");
 }
 
-async function filterServiceLinksFromHome(state: typeof StateAnnotation.State) {
-  console.log('filterServiceLinksFromHome started')
+async function filterServiceHomeLinkFromHome(state: typeof StateAnnotation.State) {
+  console.log('filterServiceHomeLinkFromHome started')
   const linksFromHomePage = state.extractedLinksFromHomePage || [];
-  return filterLinksWithPicker(linksFromHomePage, filterLinksFromHomePrompt, "filteredLinkAfterHomePage");
+  return filterLinksWithPicker(linksFromHomePage, filterServicesHomeLinkFromHomepagePrompt, "filteredLinkAfterHomePage");
 }
 
 
-async function extractServicesFromScrappedContent(state: typeof StateAnnotation.State): Promise<{ scrapedServices: string[] }> {
-  console.log('extractServicesFromScrappedContent started')
+async function filterServiceTitlesFromScrappedContent(state: typeof StateAnnotation.State): Promise<{ scrapedServices: string }> {
+  console.log('filterServiceTitlesFromScrappedContent started')
   const { scrapedServiceContent: scrapedContent } = state;
-  const response = await searchSupporter.invoke([{ type: "system", content: extractServicesFromScrappedContentPrompt(scrapedContent) }]);
+  const response = await searchSupporter.invoke([{ type: "system", content: filterServiceTitlesFromScrappedContentPrompt(scrapedContent) }]);
   const contentStr = extractStringContent(response.content);
 
-  console.log('extractServicesFromScrappedContent completed')
-  return { scrapedServices: contentStr ? JSON.parse(contentStr) : [] };
+  console.log('filterServiceTitlesFromScrappedContent completed')
+  return { scrapedServices: contentStr || '' };
 }
 
-
-async function filterServiceLinksCondition(state: typeof StateAnnotation.State) {
-  const { filteredLinkAfterSearch } = state;
-  if (filteredLinkAfterSearch.some(isHomeLink)) {
-    return "extractLinksFromHomePage";
-  }
-  return "scrapeContentFromLinks";
+function scrapeLinksOrContentCondition(state: typeof StateAnnotation.State) {
+  return state.filteredLinkAfterSearch.some(isHomeLink) ? "scrapeLinksFromHomePage" : "scrapeServiceContent";
 }
 
 function isHomeLink(link: string): boolean {
@@ -176,7 +173,7 @@ function getModelInstance(
 async function createTaskSummary(state: typeof StateAnnotation.State, modelName: LargeLanguageModel): Promise<{ messages: AIMessage[] }> {
   console.log(`---createTaskSummary started for model ${modelName}`);
   try {
-    const llmInstance = getModelInstance(modelName, 0.7, 0.2);
+    const llmInstance = getModelInstance(modelName, 0.2, 0.5);
     const retrievalToolMessage = state.messages?.find((message) => message.name === "retrieve");
     const initialUserMessage = state.messages?.find((message) => message instanceof HumanMessage);
 
@@ -204,7 +201,9 @@ async function createTaskSummary(state: typeof StateAnnotation.State, modelName:
 async function generateAd(state: typeof StateAnnotation.State, modelName: LargeLanguageModel): Promise<{ messages: AIMessage[] }> {
   console.log(`---generateAd started for model ${modelName}`);
   try {
-    const llmInstance = getModelInstance(modelName, 0.7, 0.2);
+    const temperature = useSettingsStore.getState().temperature;
+    const topP = useSettingsStore.getState().topP;
+    const llmInstance = getModelInstance(modelName, temperature, topP);
     const aiMessages = state.messages.filter(message => message instanceof AIMessage);
     const filteredModelMessage = aiMessages.find(message => {
       return message.additional_kwargs?.custom_model_name === modelName && message.additional_kwargs?.custom_function === CustomFunction.CreateTaskSummary;
@@ -242,36 +241,34 @@ function buildAugmentationGraph() {
   const graph = new StateGraph(StateAnnotation)
     .addNode("queryOrRespond", (state) => queryOrRespond(state))
     .addNode("tools", augmentToolNode)
-    .addNode("filterServiceLinksFromSearch", (state) => filterServiceLinksFromSearch(state))
-    .addNode("filterServiceLinksFromHome", (state) => filterServiceLinksFromHome(state))
-    .addNode("scrapeContentFromLinks", (state) => scrapeContentFromLinks(state))
-    .addNode("extractLinksFromHomePage", (state) => extractLinksFromHomePage(state))
-    .addNode("extractServicesFromScrappedContent", (state) => extractServicesFromScrappedContent(state))
+    .addNode("filterServiceLinkFromSearch", (state) => filterServiceLinkFromSearch(state))
+    .addNode("filterServiceHomeLinkFromHome", (state) => filterServiceHomeLinkFromHome(state))
+    .addNode("scrapeServiceContent", (state) => scrapeServiceContent(state))
+    .addNode("scrapeLinksFromHomePage", (state) => scrapeLinksFromHomePage(state))
+    .addNode("filterServiceTitlesFromScrappedContent", (state) => filterServiceTitlesFromScrappedContent(state))
 
   graph
     .addEdge("__start__", "queryOrRespond")
-    .addConditionalEdges('queryOrRespond', toolsCondition, {
-      __end__: "__end__", // Exit if no tools needed
-      tools: "tools"
-    })
-    .addEdge("tools", "filterServiceLinksFromSearch")
-    .addConditionalEdges("filterServiceLinksFromSearch", async (state) => {
-      const branch = await filterServiceLinksCondition(state);
-      state.branch = branch === "scrapeContentFromLinks" ? "direct" : "home";
-      return branch;
-    }, {
-      extractLinksFromHomePage: "extractLinksFromHomePage",
-      scrapeContentFromLinks: "scrapeContentFromLinks"
-    })
-    .addEdge("extractLinksFromHomePage", "filterServiceLinksFromHome")
-    .addEdge("filterServiceLinksFromHome", "scrapeContentFromLinks")
-    .addConditionalEdges("scrapeContentFromLinks",
-      (state) => (state.branch === "home" ? "extractServicesFromScrappedContent" : "__end__"),
+    .addConditionalEdges('queryOrRespond', toolsCondition,
       {
-        extractServicesFromScrappedContent: "extractServicesFromScrappedContent",
+        __end__: "__end__",
+        tools: "tools"
+      })
+    .addEdge("tools", "filterServiceLinkFromSearch")
+    .addConditionalEdges("filterServiceLinkFromSearch", scrapeLinksOrContentCondition,
+      {
+        scrapeLinksFromHomePage: "scrapeLinksFromHomePage",
+        scrapeServiceContent: "scrapeServiceContent"
+      })
+    .addEdge("scrapeLinksFromHomePage", "filterServiceHomeLinkFromHome")
+    .addEdge("filterServiceHomeLinkFromHome", "scrapeServiceContent")
+    .addConditionalEdges("scrapeServiceContent",
+      (state) => state.branch === "continue" ? "filterServiceTitlesFromScrappedContent" : "__end__",
+      {
+        filterServiceTitlesFromScrappedContent: "filterServiceTitlesFromScrappedContent",
         __end__: "__end__"
       })
-    .addEdge("extractServicesFromScrappedContent", "__end__");
+    .addEdge("filterServiceTitlesFromScrappedContent", "__end__");
 
   return graph.compile();
 }
@@ -305,7 +302,7 @@ async function runAugmentationWorkflow(
   messages: Message[],
   onStep: (step: StepStreamData) => void,
   initialAugmentationRequired: boolean = false
-): Promise<boolean> {
+): Promise<{ augmentationRequired: boolean, terminatFurtherActions: boolean }> {
   let augmentationRequired = initialAugmentationRequired;
 
   const augmentationGraph = buildAugmentationGraph();
@@ -316,20 +313,23 @@ async function runAugmentationWorkflow(
   let scrapedServices: string = ''
   let linksUsedForScraping: string = ''
 
+  const rateLimitResponse = await checkRateLimit();
+
   try {
+    if (rateLimitResponse) {
+      onStep({ type: GraphStep.Error, content: rateLimitResponse.generatedContent });
+      return { augmentationRequired: false, terminatFurtherActions: true };
+    }
+
     for await (const step of await augmentationGraph.stream({ messages: langchainMessagesForAugmentation }, { streamMode: "values" })) {
       const retrieveMessage = step.messages?.find((message) => message.name === "retrieve");
 
       const errorMessage = step.messages?.find(message => message.additional_kwargs?.error === true);
 
       if (errorMessage) {
-        onStep({
-          type: GraphStep.Error,
-          content: extractStringContent(errorMessage.content),
-        });
-        return false;
+        onStep({ type: GraphStep.Error, content: extractStringContent(errorMessage.content) });
+        return { augmentationRequired: false, terminatFurtherActions: true };
       }
-
 
       if (!retrievalContent && retrieveMessage) {
         retrievalContent = extractStringContent(retrieveMessage.content);
@@ -347,16 +347,16 @@ async function runAugmentationWorkflow(
         onStep({ type: GraphStep.ScrapedServiceContent, content: scrapedServiceContent });
       }
 
-      if (!scrapedServices && step.scrapedServices?.length) {
-        scrapedServices = JSON.stringify(step.scrapedServices);
+      if (!scrapedServices && step.scrapedServices) {
+        scrapedServices = step.scrapedServices;
         onStep({ type: GraphStep.ScrapedServices, content: scrapedServices });
       }
     }
-    return augmentationRequired;
+    return { augmentationRequired, terminatFurtherActions: false };
   } catch (error) {
     console.error("❌ Error in runAugmentationWorkflow:", error);
     onStep({ type: GraphStep.Error, content: `❌ Augmentation error: ${String(error)}\n\n` });
-    return false;
+    return { augmentationRequired: false, terminatFurtherActions: true };
   }
 }
 
@@ -460,6 +460,10 @@ export async function runWorkflow(
   models: LargeLanguageModel[],
   onStep: (step: StepStreamData) => void
 ): Promise<void> {
-  const augmentationRequired = await runAugmentationWorkflow(messages, onStep, false);
-  await runCreationWorkflow(messages, models, onStep, augmentationRequired);
+  const response = await runAugmentationWorkflow(messages, onStep, false);
+  if (response.terminatFurtherActions) {
+    return
+  }
+
+  await runCreationWorkflow(messages, models, onStep, response.augmentationRequired);
 }

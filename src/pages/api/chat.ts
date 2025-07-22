@@ -1,4 +1,4 @@
-import { runWorkflow } from "@/services/rag/rag";
+import { runWorkflow } from "@/services/graph/graph";
 import type { NextApiRequest, NextApiResponse } from "next";
 
 export const config = {

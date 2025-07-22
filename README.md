@@ -1,17 +1,14 @@
 ## Ai_copywriter_app
 
-RAG application based on 3 models generating ads for for media channels based on knowledge base context.
+Agentic-RAG application based on 3 models generating ads for for media channels based on knowledge base context and web-search results.
 
 ## 🚀 Features
 
 - Multi-model ad generation (OpenAI, Gemini, Claude)
 - Retrieval-Augmented Generation (RAG) using a knowledge base
 - Model selection: run all models or just one
-- Context-aware ad creation for various media channels (Facebook, Google Ads, Email, etc.)
-- Save generated ads to the knowledge base on request
-- Tone matching and self-feedback for ads
-- Web browsing tool for fetching information from URLs
-- Adjustable AI settings (prompt strategy, temperature, top-p)
+- Web search with content scraping capability for concrete company and its services
+- Adjustable AI settings (temperature, top-p)
 - Chat history and session management
 - Download chat sessions (JSON, CSV, PDF)
 - Rate limiting with Upstash
@@ -28,7 +25,6 @@ copywriter_ai/
 ├── package.json
 ├── tailwind.config.ts
 ├── tsconfig.json
-├── .env.local.example
 ├── /public
 ├── /src
 │   ├── /components
@@ -38,40 +34,50 @@ copywriter_ai/
 │   │   ├── Sidebar.tsx
 │   │   ├── ui/
 │   │   │   ├── button.tsx
-│   │   │   ├── download-select.tsx
-│   │   │   ├── toggle.tsx
+│   │   │   ├── .......
+│   ├── /enums
+│   │   ├── customFunction.enum.ts
+│   │   ├── .......
+│   ├── /fonts
 │   ├── /models
 │   │   ├── chatSession.model.ts
-│   │   ├── documentMetadata.model.ts
-│   │   ├── message.model.ts
+│   │   ├── .......
 │   ├── /pages
+│   │   ├── api
+│   │   │   ├── chat.ts
 │   │   ├── _app.tsx
+│   │   ├── 404.tsx
 │   │   ├── index.tsx
+│   │   ├── settings.tsx
 │   ├── /services
+│   │   ├── graph
+│   │   │   ├── graph.ts
+│   │   │   ├── graphTools.ts
 │   │   ├── knowledgeBase.ts
-│   │   ├── rag.ts
-│   │   ├── tools.ts
+│   │   ├── chatApiRequest.ts
+│   │   ├── rateLimitCheck.ts
 │   ├── /store
-│   │   ├── messageStateStore.ts
+│   │   ├── chatStore.ts
+│   │   ├── settingsStore.ts
 │   ├── /styles
 │   │   ├── globals.css
 │   ├── /system_prompts
 │   │   ├── system_prompts.ts
 │   ├── /utils
+│   │   ├── knowledgeBaseUtils.ts
 │   │   └── utils.ts
+
 ```
 
 - **components/**: React UI components (chat, sidebar, buttons, etc.)
 - **models/**: TypeScript models for chat sessions, messages, documents
 - **pages/**: Next.js pages (entry points)
-- **services/**: Business logic, RAG, tools, knowledge base integration
+- **services/**: Business logic, graphs, tools, knowledge base integration
 - **store/**: State management (e.g., Zustand)
 - **styles/**: Tailwind/global CSS
-- **system_prompts/**: System prompt templates for different strategies
+- **system_prompts/**: System prompt templates
 - **utils/**: Utility/helper functions
 
-
-Flow - tba.
 ---
 
 ## 💻 Getting Started
@@ -84,7 +90,7 @@ Flow - tba.
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/TomasVask/ai_copywriter
+   git clone https://github.com/TomasVask/ai_copywriter_2
    cd interview-prep-app
    ```
 
@@ -123,22 +129,84 @@ Flow - tba.
 
 ## 🎛 AI Settings
 
-- **Prompt Strategy**:
-  - `Chain-of-Thought`: Step-by-step reasoning
-  - `Self-Refinement`: AI iterates on its own questions
-  - `Maieutic`: Socratic questioning method
 - **Temperature**: Controls randomness (`0.0–1.0`)
 - **Top P**: Controls diversity (`0.0–1.0`)
+
+---
+
+# Logical graph's flow
+
+## Augmentation Graph
+   QueryOrRespond decides whether augmentation is needed, if not, graph end and then Creation Graph takes over.
+   If augmentation is needed, it calls KB retrieval tool and web-search tool. 
+   Web-search tool has its own flow where idea is to scrape content from single link. Priority is url link of concrete service of company, if not, then it scrapes list of services titles and returns a list.
+
+__start__
+   |
+   v
+queryOrRespond
+   |
+   +--------------------------------+
+   |                                |
+   | (if tools needed)              | (no tools needed)
+   v                                v
+tools                            __end__
+   |
+   +--------------------------------+
+   |                                |
+webSearchTool                     retrieveTool
+   |                                
+   v                                
+filterServiceLinkFromSearch
+   |
+   +--------------------------------+
+   |                                |
+   | (if home link)                 | (if service link)
+   v                                v
+scrapeLinksFromHomePage          scrapeServiceContent
+   |                                |
+   v                                v
+filterServiceHomeLinkFromHome     __end__
+   |                               
+   v                               
+scrapeServiceContent              
+   |                               
+   v                               
+filterServiceTitlesFromScrappedContent
+   |
+   v
+__end__
+
+## Creation Graph
+   Once augmentation is finished, or not performed at all, creation graphs take over. 
+   One graph is run per each active model. If augmentation was performed, then graph run taskSummary function to create a task for itself with combined user prompt and all contextual information. Then it runs ad generation.
+   Ad generation also covers any other random response should user prompt be random.
+
+            Model: OpenAI                  Model: Claude                   Model: Gemini
+                 |                              |                               |
+                 v                              v                               v
+             __start__                      __start__                       __start__
+                 |                              |                               |
+         +----------------+           +----------------+              +----------------+
+         |                |           |                |              |                |
+         | ran augment.   |           | ran augment.   |              | ran augment.   |
+         |                |           |                |              |                |
+         v                v           v                v              v                v
+   createTaskSummary   generateAd  createTaskSummary generateAd  createTaskSummary generateAd
+         |                |           |                |              |                |
+         v                |           v                |              v                |
+     generateAd <---------+       generateAd <---------+          generateAd <---------+
+         |                              |                               |
+         v                              v                               v
+      __end__                        __end__                         __end__
 
 ---
 
 # 📝 Usage
 
 1. Describe what ad you would like create (the media channel, which company, tone of voice, etc).
-2. The AI models retrieve data from knowledge base and create the ad.
+2. The AI models retrieve data from knowledge base, will perform websearch and scraping of service-related info, based on this info will formulate task summary and will create ad.
 3. Follow up to reiterate fro better results
-4. Ask to save created ads in to the knowledge base - just ask to do it.
-5. Ask to run tone matching function to self-feedback the ads to see if it matches chosen media tone of voice.
 6. Toggle between models work with all 3 simultaneously or pick just one.
 6. Change settings for your chat experience
 
@@ -149,12 +217,12 @@ Flow - tba.
 ## 🔌 Adding New Features
 
 - **Save history to separate DB**
-- **Add more versatile websearch tool**
 - **Add CANVAS feature to each chat window**: to select wanted piece of text and follow up on that text.
 - **Enhance knowledge base with Facebook ads from Facebook DB**
 - **Add user authentication**
 - **Improve structuring of responses**
 - **Improve tone matching function**
+- **Add human in the loop for saving good ads to knowledge base**
 
 ---
 

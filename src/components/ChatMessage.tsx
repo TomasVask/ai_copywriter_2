@@ -12,7 +12,7 @@ export function ChatMessage({
   message,
   modelKey,
   isLatestAssistantMessage
-}: ChatMessageProps) {
+}: Readonly<ChatMessageProps>) {
   if (modelKey && !message.activeModels?.includes(modelKey as LargeLanguageModel)) {
     return null;
   }

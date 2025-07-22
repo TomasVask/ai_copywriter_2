@@ -99,10 +99,10 @@ export const augmentationSystemPrompt = `
   Atsakyk tik tada, kai nuspręsi, ar papildomas informacija yra būtina.
 `
 
-export const filterLinksFromSearchPrompt = (stringfiedUrlList: string) => `
+export const filterLinkFromSearchPrompt = (stringfiedUrlList: string) => `
   Esi asistentas atsakingas už web nuorodų atrinkimą iš pateikto sąrašo.
   Web nuorodos: ${stringfiedUrlList}
-  Tavo užduotis – identifikuoti konkrečios įmonės puslapio nuorodas, kurios referuoja į įmonės teikiamas paslaugas ar produktus.
+  Tavo užduotis – identifikuoti konkrečios įmonės puslapio nuorodą, kuri referuoja į įmonės teikiamas paslaugas ar produktus.
 
   Taisyklės:
   1. Jeigu sąraše yra nuoroda į konkrečią paslaugą (pvz., https://ABCcompany.lt/dantu-implantai arba https://ABCcompany.lt/paslaugos/endodontija-danties-saknies-kanalo-gydymas, 
@@ -122,14 +122,14 @@ export const filterLinksFromSearchPrompt = (stringfiedUrlList: string) => `
   **Nerašyk jokio papildomo paaiškinimo ar teksto, tik gryną JSON masyvą.**
 `;
 
-export const filterLinksFromHomePrompt = (stringfiedUrlList: string) => `
+export const filterServicesHomeLinkFromHomepagePrompt = (stringfiedUrlList: string) => `
   Esi asistentas atsakingas už web nuorodų atrinkimą iš pateikto sąrašo.
   Web nuorodos: ${stringfiedUrlList}
   Tavo užduotis – atrinkti nuorodą referuojančią į įmonės paslaugų puslapį.
 
   Taisyklės:
   1. Jeigu sąraše yra nuoroda į konkrečią paslaugą (pvz., https://ABCcompany.lt/dantu-implantai arba https://ABCcompany.lt/paslaugos/endodontija-danties-saknies-kanalo-gydymas, 
-  arba https://ABCcompany.lt/services/dantu-higiena, arba https://ABCcompany.lt/paslaugos-dantu-taisymas), Ignoruok tokią nuorodą.
+  arba https://ABCcompany.lt/services/dantu-higiena, arba https://ABCcompany.lt/paslaugos-dantu-taisymas), ignoruok tokią nuorodą.
   2. JEigu sąraše yra nuoroda https://ABCcompany.lt/paslaugos arba https://ABCcompany.lt/services, gražink tokią nuorodą. Jei nerandi nuorodų pagal šiuos pavyzdžius, 
   bandyk ieškoti kitų nuorodų, kuriosreferuoja į paslaugų puslapį.
   3. Ignoruok nuorodas į kainų puslapius, nebent vartotojas prašo tiesiogiai kainos informacijos.
@@ -145,7 +145,7 @@ export const filterLinksFromHomePrompt = (stringfiedUrlList: string) => `
   **Nerašyk jokio papildomo paaiškinimo ar teksto, tik gryną JSON masyvą.**
 `;
 
-export const extractServicesFromScrappedContentPrompt = (scrapedContent: string) => `
+export const filterServiceTitlesFromScrappedContentPrompt = (scrapedContent: string) => `
   Esi asistentas, atsakingas už paslaugų išskyrimą iš pateikto turinio.
   Pateiktas turinys: ${scrapedContent}.
   Tavo užduotis – atrinkti unikalias paslaugas. Paslauga gali atrodyti kaip: "Paslauga xyz", "Paslauga xyz - tai procedūra, kuri...", "Paslauga xyz - ...".
@@ -162,7 +162,7 @@ export const extractServicesFromScrappedContentPrompt = (scrapedContent: string)
 export const createTaskSummaryPrompt = (
   initialUserPrompt: string,
   scrapedServiceContent: string,
-  scrapedServices: string[],
+  scrapedServices: string,
   retrievedContext: string
 ) =>
   `Esi reklamos turinio kūrimo ekspertas. Remiantis toliau pateikta informacija sukurk apibendrinamąjį straipsnį, kuris bus naudojamas reklaminės žinutės kūrimui.\n\n` +

@@ -3,13 +3,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { Slider } from '@/components/ui/slider';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { PromptStrategyKey } from '@/models/promptStrategy.model';
 import { systemPrompts } from '@/system_prompts/system_prompts';
-import { PromptStrategy } from '@/enums/promptStrategy.enum';
 import { useSettingsStore } from "@/store/settingsStore";
-
 
 const SettingsPage = () => {
   const temperature = useSettingsStore((s) => s.temperature);
@@ -37,7 +33,7 @@ const SettingsPage = () => {
             <CardHeader>
               <CardTitle>Modelių konfigūravimas</CardTitle>
               <CardDescription>
-                Koreguok nustatymus, kaip AI modeliai turetu reaguoti į tavo užklausas
+                Koreguok nustatymus, kaip AI modeliai turetu kurti reklamas
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">

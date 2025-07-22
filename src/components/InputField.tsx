@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { ArrowUp } from 'lucide-react';
+import { ArrowUp, AlertCircle } from 'lucide-react';
 import { Textarea } from './ui/textarea';
 import { normalizeQuery } from '@/utils/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertCircle } from 'lucide-react';
 import { Toggle } from './ui/toggle';
 import { LargeLanguageModel } from '@/models/largeLanguageModel.model';
 

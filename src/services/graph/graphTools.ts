@@ -4,8 +4,8 @@ import { tool } from "@langchain/core/tools";
 import { ToolNode } from "@langchain/langgraph/prebuilt";
 import axios from "axios";
 import { Page, PlaywrightWebBaseLoader } from "@langchain/community/document_loaders/web/playwright";
-import { chromium } from "playwright"; // Add this import
-import { StateAnnotation } from "./rag";
+import { chromium } from "playwright";
+import { StateAnnotation } from "./graph";
 
 const retrieveSchema = z.object({
   query: z.string(),
@@ -98,8 +98,10 @@ export const webSearchTool = tool(
 
 export const augmentToolNode = new ToolNode([retrieveTool, webSearchTool]);
 
-export async function extractLinksFromHomePage(state: typeof StateAnnotation.State): Promise<{ extractedLinksFromHomePage: string[] }> {
-  console.log('extractLinksFromHomePage started')
+export async function scrapeLinksFromHomePage(
+  state: typeof StateAnnotation.State
+): Promise<{ extractedLinksFromHomePage: string[], branch: 'continue' | 'end' }> {
+  console.log('scrapeLinksFromHomePage started')
   const { filteredLinkAfterSearch: filteredLinks } = state;
   const homeUrl = filteredLinks[0];
   try {
@@ -110,18 +112,18 @@ export async function extractLinksFromHomePage(state: typeof StateAnnotation.Sta
     const extractedLinks: string[] = await page.$$eval('a', as => as.map(a => a.href));
     const uniqueLinks = Array.from(new Set(extractedLinks)).filter(href => href.startsWith(homeUrl.split('/').slice(0, 3).join('/')));
     await browser.close();
-    console.log('extractLinksFromHomePage completed')
-    return { extractedLinksFromHomePage: uniqueLinks };
+    console.log('scrapeLinksFromHomePage completed')
+    return { extractedLinksFromHomePage: uniqueLinks, branch: 'continue' };
   } catch (error) {
     console.error("Error extracting links:", error);
-    return { extractedLinksFromHomePage: [] };
+    return { extractedLinksFromHomePage: [], branch: 'end' };
   }
 }
 
-export async function scrapeContentFromLinks(
+export async function scrapeServiceContent(
   state: typeof StateAnnotation.State
 ): Promise<{ scrapedServiceContent: string, linksUsedForScraping: string[] }> {
-  console.log('scrapeContentFromLinks started')
+  console.log('scrapeServiceContent started')
   const { filteredLinkAfterSearch } = state;
   const { filteredLinkAfterHomePage } = state;
 
@@ -159,14 +161,14 @@ export async function scrapeContentFromLinks(
 
   if (!allContent) {
     return {
-      scrapedServiceContent: "Nerasta paslaugų informacijos šioje svetainėje.",
+      scrapedServiceContent: "Nerasta paslaugos informacijos šioje svetainėje.",
       linksUsedForScraping: filteredLinks
     }
   }
 
-  console.log("scrapeContentFromLinks completed")
+  console.log("scrapeServiceContent completed")
   return {
-    scrapedServiceContent: `Surinkta informacija apie paslaugas:\n${allContent}`,
+    scrapedServiceContent: `Surinkta informacija apie paslaugą:\n${allContent}`,
     linksUsedForScraping: filteredLinks
   };
 }

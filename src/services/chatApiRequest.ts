@@ -9,7 +9,7 @@ export const sendChatMessageToRagApi = async (
   onStep: (data: StepStreamData) => void
 ) => {
   try {
-    const response = await fetch('/api/retrieve', {
+    const response = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ messages, models }),
