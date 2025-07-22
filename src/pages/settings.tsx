@@ -4,7 +4,6 @@ import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
-import { systemPrompts } from '@/system_prompts/system_prompts';
 import { useSettingsStore } from "@/store/settingsStore";
 
 const SettingsPage = () => {
@@ -79,18 +78,6 @@ const SettingsPage = () => {
                 Tai yra pamatinės taisyklės, kuriomis remiasi tavo AI asistentas. Jos padeda jam geriau suprasti, kaip reaguoti į tavo užklausas ir kokiu tonu bendrauti.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {systemPrompts.map((prompt) => (
-                <div key={prompt.id} className="border rounded-lg p-4 bg-white">
-                  <h4 className="font-semibold text-lg mb-3 text-gray-900">{prompt.title}</h4>
-                  <div className="bg-gray-50 p-4 rounded-md">
-                    <pre className="text-xs text-gray-700 whitespace-pre-line font-mono leading-relaxed">
-                      {prompt.content}
-                    </pre>
-                  </div>
-                </div>
-              ))}
-            </CardContent>
           </Card>
         </div>
       </div>

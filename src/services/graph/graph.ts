@@ -15,6 +15,7 @@ import { StepStreamData } from "@/models/stepStreamData.model";
 import { CustomFunction } from "@/enums/customFunction.enum";
 import { useSettingsStore } from "@/store/settingsStore";
 import { checkRateLimit } from "../rateLimitCheck";
+import { z } from "zod";
 
 const retrievalOrchestrator = new ChatOpenAI({
   model: "gpt-4.1",
@@ -29,6 +30,11 @@ const searchSupporter = new ChatOpenAI({
   topP: 1.0,
   maxTokens: 400
 })
+
+const generateAdSchema = z.object({
+  adText: z.string().optional().describe("Sukurto reklamos teksto turinys"),
+  otherText: z.string().optional().describe("Bet koks kitas tekstas, kuris nėra reklamos turinys"),
+});
 
 export const StateAnnotation = Annotation.Root({
   messages: Annotation<BaseMessage[]>({
@@ -223,12 +229,16 @@ async function generateAd(state: typeof StateAnnotation.State, modelName: LargeL
       new SystemMessage(generateAdPrompt(taskSummary)),
       ...conversationMessages
     ];
-    const response = await llmInstance.invoke(prompt);
-    response.additional_kwargs = {
-      ...response.additional_kwargs,
-      custom_model_name: modelName,
-      custom_function: CustomFunction.GenerateAdContent,
-    }
+    const llmWithSchema = llmInstance.withStructuredOutput(generateAdSchema);
+    const structuredResponse = await llmWithSchema.invoke(prompt);
+
+    const response = new AIMessage({
+      content: JSON.stringify(structuredResponse),
+      additional_kwargs: {
+        custom_model_name: modelName,
+        custom_function: CustomFunction.GenerateAdContent,
+      }
+    });
 
     return { messages: [response] };
   } catch (error) {
