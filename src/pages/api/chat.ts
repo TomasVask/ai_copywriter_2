@@ -32,7 +32,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Custom flush function to force immediate sending
     const flush = () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if (typeof (res as any).flush === 'function') {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (res as any).flush();
       }
     };

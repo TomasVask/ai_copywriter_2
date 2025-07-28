@@ -26,6 +26,7 @@ const ChatArea = ({ messages }: ChatAreaProps) => {
         ref.current.scrollTop = ref.current.scrollHeight;
       }
     });
+    // eslint-disable-next-line
   }, [messages]);
 
   return (

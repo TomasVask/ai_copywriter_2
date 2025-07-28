@@ -155,8 +155,6 @@ export function handleModelError(
     errorMessage = (typeof error === 'object' && (error as { error: any }).error) ? (error as { error: any })?.error?.error?.message : String(error);
   }
 
-  errorMessage = String(error);
-
   let customErrorMessage: AIMessage
   if (modelName && customFunction) {
     console.error(`❌ Error while ${CustomFunction.GenerateAdContent ? 'generating ad' : 'creating task summary'} with model ${modelName}:`, errorMessage);
