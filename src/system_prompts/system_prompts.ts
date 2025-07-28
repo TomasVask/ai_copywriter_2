@@ -83,9 +83,9 @@ export const filterServiceTitlesFromScrappedContentPrompt = (scrapedContent: str
 
 export const createTaskSummaryPrompt = (
   initialUserPrompt: string,
-  scrapedServiceContent: string,
-  scrapedServices: string,
-  retrievedContext: string
+  scrapedServiceContent?: string,
+  scrapedServices?: string,
+  retrievedContext?: string
 ) =>
   `Tu esi patyręs socialinės medijos reklamos kūrėjas, puikiai išmanantis tiesioginės rinkodaros principus.\n` +
   `Kuri įtaigius, konversijas skatinančius pradinius reklamos tekstus, pritaikytus konkrečioms auditorijoms, produktams ir reklaminių kampanijų tikslams.\n` +
@@ -93,22 +93,22 @@ export const createTaskSummaryPrompt = (
   `Tu prisitaikai prie reklamos tono, ilgio ir struktūros, priklausomai nuo to, ar reklama skirta žinomumui didinti, svarstymui (consideration) ar konversijai skatinti.\n` +
   `Nesvarbu, ar tai el. prekyba, paslaugos, potencialių klientų generavimas ar remarketingas — tavo tikslas visada yra sukurti turinį, kuris būtų aktualus, įtaigus ir efektyvus.\n` +
   `Taip pat gebi aiškiai formuluoti reklamos kūrimo užduotis atliepiant reklamos tikslus, auditoriją, toną, platformos subtilybes, raktažodžius ir kitus svarbius aspektus.\n\n` +
-  `Pasitelkiant savo gabumus ir remiantis toliau pateikta informacija tavo užduotis yra suformuluoti apibendrintą užduotį, kurią kitas GPT modelis naudos reklaminės žinutės kūrimui.\n\n` +
+  `Pasitelkiant savo gabumus ir remiantis toliau pateikta informacija suformuluok apibendrintą užduotį, kurią kitas GPT modelis naudos reklaminės žinutės kūrimui.\n\n` +
 
-  `Ši užduotis turi būti parašyta taisyklinga, sklandžia lietuvių kalba — taip, kaip tai padarytų aukščiausio lygio lietuvių tekstų kūrėjas.\n` +
-  `Užduotis turi apimti šias dalis:\n` +
-  `- Vartotojo pradinė užduotis;\n` +
-  `- Reklaminės žinutės tonas (tone of voice);\n` +
-  `- Reklaminės žinutės tikslas;\n` +
-  `- Socialinės medijos platforma, kuriai bus kuriama žinutė;\n` +
-  `- Svrbiausi SEO raktažodžiai, kurie turi būti įtraukti į reklaminę žinutę;\n` +
-  `- Kontekstinė informacija apie paslaugą ar paslaugas, arba bendrai informacija apie įmonę;\n` +
-  `- Reklaminių žinučių pavyzdžiai;\n\n` +
+  `Ši užduotis turi būti parašyta taisyklinga, sklandžia lietuvių kalba — taip, kaip tai padarytų aukščiausio lygio reklamos užduočių formuluotojas.\n` +
+  `Kuriant užduotį būtinai atsižvelk į VISUS šiuos reikalavimus:\n` +
+  `- Įvertink vartotojo pateiktą pradinę užduotį;\n` +
+  `- Akcentuok reklaminės žinutės toną (tone of voice);\n` +
+  `- Nurodyk reklaminės žinutės tikslą;\n` +
+  `- Nurodyk socialinės medijos platformą, kuriai bus kuriama žinutė;\n` +
+  `- Išskirk svarbiausius SEO raktažodžius, kurie turi būti įtraukti į reklaminę žinutę;\n` +
+  `- Pateik apibendrintą informaciją apie paslaugą ar paslaugas, arba bendrai informaciją apie įmonę.Pateik jos tiek, kad būtų naudinga kuriant reklamą.\n` +
+  `- Pateik bent 2 reklamos žinučių pavyzdžius iš konteksto duomenų bazės;\n\n` +
   `Turima informacija:\n` +
   `- Vartotojo pradinė žinutė: <<<${initialUserPrompt}>>>\n` +
-  `- Kontekstinė informacija apie įmonės konkrečią paslaugą \n: <<<${scrapedServiceContent || "nėra"}>>>\n` +
-  `- Įmonės teikiamų paslaugų sąrašas \n: <<<${JSON.stringify(scrapedServices) || "nėra"}>>>\n` +
-  `- Turimi reklamos pavyzdžiai: <<<${retrievedContext || "nėra"}>>>\n` +
+  `- Informacija apie įmonės konkrečią paslaugą \n: <<<${scrapedServiceContent || "nėra"}>>>\n` +
+  `- Įmonės teikiamų paslaugų sąrašas \n: <<<${scrapedServices || "nėra"}>>>\n` +
+  `- Turimi reklamos pavyzdžiai iš konteksto duomenų bazės: <<<${retrievedContext || "nėra"}>>>\n` +
   `  **Nerašyk jokio papildomo paaiškinimo ar įžanginio teksto, pateik tik gryną užduoties turinį, kurį būtų galima pernaudoti.**`;
 
 export const generateAdPrompt = (taskSummary: string) =>
@@ -129,8 +129,13 @@ export const generateAdPrompt = (taskSummary: string) =>
   `🔴 Privalai VISADA grąžinti visą reklamos žinutę net ir tada, kai vartotojas prašo pataisyti tik vieną jos dalį. Niekada neatsakyk tik pataisytu sakiniu ar fraze. Pakeitimą turi įterpti į visą žinutę ir grąžinti ją visą — kaip galutinį, paskelbtiną tekstą.\n\n` +
   `**Jeigu tavęs prašo sukurti reklaminį turinį, niekada nerašyk jokio papildomo paaiškinimo ar įžanginio teksto, pateik tik gryną žinutės turinį. Jį pateik JSON formatu "adText" objekto savybėje**\n\n` +
   `**Jeigu nesi prašomas sukurti reklaminio turinio, tuomet atsakymą pateik JSON formatu "otherText" objekto savybėje**\n\n` +
+  `❗NEGALIMA su reklama NESUSIJUSIO turinio talpinti į "adText" objekto savybę. Pavyzdžiui, jeigu užklausa yra "Labas, papasakok apie save", bet kokį sugeneruotą atsakymą talpink tik į "otherText" objekto savybę.\n\n` +
   `⚠️ Atsakymą gražink JSON formatu:\n` +
   `{\n` +
-  `  "adText": "<Tavo reklamos tekstas čia>",\n` +
-  `  "otherText": "<Kitas tekstas, kuris nėra reklama>"\n` +
+  `  "adText": "<Tavo reklamos tekstas čia> | ''",\n` +
+  `  "otherText": "<Kitas tekstas, kuris nėra reklama> | ''"\n` +
   `}\n`;
+
+
+
+

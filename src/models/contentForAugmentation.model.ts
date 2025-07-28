@@ -1,6 +1,7 @@
 export interface ContentForAugmentation {
   augmentationId?: string;
-  retrievedContent?: string;
+  retrievalContent?: string;
   scrapedServices?: string;
   scrapedServiceContent?: string;
+  linksUsedForScraping?: string;
 }

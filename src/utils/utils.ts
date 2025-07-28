@@ -1,15 +1,16 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
-import { HumanMessage, AIMessage, BaseMessage, MessageContent } from "@langchain/core/messages";
+import { HumanMessage, AIMessage, BaseMessage, MessageContent, ToolMessage } from "@langchain/core/messages";
 import type { Message } from "@/models/message.model";
 import { LargeLanguageModel } from "@/models/largeLanguageModel.model";
 import { CustomFunction } from "@/enums/customFunction.enum";
+import { StateAnnotation } from "@/services/graph/graph";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function toLangChainMessagesForCreation(messages: Message[], model: LargeLanguageModel): BaseMessage[] {
+export function toBaseMessagesForAdGeneration(messages: Message[], model: LargeLanguageModel): BaseMessage[] {
   const content: BaseMessage[] = [];
   messages.forEach(msg => {
     if (msg.role === "user") {
@@ -41,10 +42,11 @@ export function toLangChainMessagesForCreation(messages: Message[], model: Large
       }
     }
   })
+
   return content;
 }
 
-export function toLangChainMessagesForAugmentation(messages: Message[]): BaseMessage[] {
+export function toBaseMessageForAugmentation(messages: Message[]): BaseMessage[] {
   const content: BaseMessage[] = [];
   messages.forEach(msg => {
     if (msg.role === "user") {
@@ -53,19 +55,62 @@ export function toLangChainMessagesForAugmentation(messages: Message[]): BaseMes
 
     if (msg.role === "assistant") {
       if (msg.retrievedContent) {
-        content.push(new AIMessage(msg.retrievedContent));
+        const newMessage = new AIMessage({
+          content: msg.retrievedContent,
+          additional_kwargs: {
+            custom_function: CustomFunction.RetrievalContent,
+          }
+        });
+        content.push(newMessage);
       }
 
       if (msg.scrapedServices) {
-        content.push(new AIMessage(msg.scrapedServices));
+        const newMessage = new AIMessage({
+          content: msg.scrapedServices,
+          additional_kwargs: {
+            custom_function: CustomFunction.ScrapedServices,
+          }
+        })
+        content.push(newMessage);
       }
 
       if (msg.scrapedServiceContent) {
-        content.push(new AIMessage(msg.scrapedServiceContent));
+        const newMessage = new AIMessage({
+          content: msg.scrapedServiceContent,
+          additional_kwargs: {
+            custom_function: CustomFunction.ScrapedServiceContent,
+          }
+        });
+        content.push(newMessage);
       }
     }
   })
   return content;
+}
+
+export function toBaseMessagesForSummary(state: typeof StateAnnotation.State): BaseMessage[] {
+  const content: BaseMessage[] = [];
+  const retrieve = state.messages.find(message => message instanceof ToolMessage && message.name === 'retrieve')
+  if (retrieve) content.push(retrieve)
+  if (state.scrapedServiceContent) {
+    content.push(new AIMessage({
+      content: state.scrapedServiceContent,
+      additional_kwargs: {
+        custom_function: CustomFunction.ScrapedServiceContent,
+      }
+    }));
+  }
+
+  if (state.scrapedServices) {
+    content.push(new AIMessage({
+      content: state.scrapedServices,
+      additional_kwargs: {
+        custom_function: CustomFunction.ScrapedServices,
+      }
+    }));
+  }
+
+  return content
 }
 
 export function normalizeQuery(query: string): string {

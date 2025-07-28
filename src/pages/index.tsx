@@ -16,6 +16,9 @@ export default function Home() {
   const setCurrentSession = useChatStore((s) => s.setCurrentSession);
   const chatHistory = useChatStore((s) => s.chatHistory);
   const setChatHistory = useChatStore((s) => s.setChatHistory);
+  const [lastSelectedModels, setLastSelectedModels] = useState<LargeLanguageModel[]>([
+    'openai', 'anthropic', 'gemini'
+  ]);
 
   function getUpdatedSession(
     currentSession: ChatSession | null,
@@ -67,6 +70,8 @@ export default function Home() {
     content: string,
     activeModels: LargeLanguageModel[]
   ) => {
+    setLastSelectedModels(activeModels);
+
     const newMessage: Message = {
       id: Date.now().toString(),
       content,
@@ -178,7 +183,6 @@ export default function Home() {
             }
             return msg;
           });
-          console.log("Updated messages:", updatedMessages);
 
           setCurrentSession({ ...currentSessionValue, messages: updatedMessages });
           updateChatHistory(currentSessionValue.id, updatedMessages);
@@ -272,7 +276,8 @@ export default function Home() {
           <>
             <ChatArea messages={currentSession.messages} />
             <div className="p-4 border-t border-border bg-white">
-              <InputField onSubmit={handleNewMessage} />
+              <InputField onSubmit={handleNewMessage}
+                defaultModels={lastSelectedModels} />
             </div>
           </>
         ) : (
@@ -283,6 +288,7 @@ export default function Home() {
               </h1>
               <InputField
                 onSubmit={handleNewMessage}
+                defaultModels={lastSelectedModels}
               />
             </div>
           </div>

@@ -1,4 +1,5 @@
 import { ModelResponseAction } from "@/enums/modelResponseAction.enum";
+import { GeneratedAdResponse } from "@/models/generatedAdResponse.model";
 import { LargeLanguageModel } from "@/models/largeLanguageModel.model";
 import { Message } from "@/models/message.model";
 
@@ -36,8 +37,9 @@ export function ChatMessage({
     return null;
   }
 
-  const parsedGeneratedContent = modelResponse?.generatedContent ? JSON.parse(modelResponse.generatedContent) : null;
-  console.log("Parsed Generated Content:", parsedGeneratedContent);
+  const parsedGeneratedAdContent: GeneratedAdResponse = modelResponse?.generatedContent ?
+    JSON.parse(modelResponse.generatedContent) :
+    null;
   return (
     <div className="flex justify-start relative">
       <div className="p-3 rounded-lg text-sm max-w-[95%] bg-gray-50">
@@ -56,9 +58,9 @@ export function ChatMessage({
 
         {/* Task Summary Section */}
         {(modelResponse?.taskSummary) && (
-          <div className="mb-3">
-            <div className="font-medium text-xs text-gray-500 mb-1">SUMMARY</div>
-            <div>
+          <div className="mb-8 whitespace-pre-wrap">
+            <div className="bg-green-100 rounded-lg py-1 px-2 text-xs whitespace-pre-wrap">
+              <div className="font-medium  text-gray-500 mb-1">UŽDUOTIS:</div>
               {modelResponse?.taskSummary}
             </div>
           </div>
@@ -77,13 +79,13 @@ export function ChatMessage({
         {modelResponse?.generatedContent && !hasError && (
           <div className="mt-3">
             <div>
-              {parsedGeneratedContent?.adText && (
-                <div className="bg-gray-200 rounded-lg py-1 px-2 font-light">
-                  <div className="font-medium text-xs text-gray-500 mb-1">REKLAMINIS TURINYS</div>
-                  {parsedGeneratedContent.adText}
+              {parsedGeneratedAdContent?.adText && (
+                <div className="bg-gray-200 rounded-lg py-1 px-2 font-light whitespace-pre-wrap">
+                  <div className="font-medium text-xs text-gray-500 mb-1">REKLAMA:</div>
+                  {parsedGeneratedAdContent.adText}
                 </div>)
               }
-              {parsedGeneratedContent?.otherText && parsedGeneratedContent.otherText}
+              {parsedGeneratedAdContent?.otherText && parsedGeneratedAdContent.otherText}
             </div>
           </div>
         )}

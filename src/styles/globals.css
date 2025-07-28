@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-@theme{
+@theme {
  --color-background: rgb(250, 250, 250);
   --color-foreground: rgb(30, 27, 25);
 

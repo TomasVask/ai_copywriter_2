@@ -1,10 +1,10 @@
 import { ChatOpenAI, ChatOpenAICallOptions } from "@langchain/openai";
 import { Annotation, StateGraph } from "@langchain/langgraph";
-import { AIMessage, HumanMessage, SystemMessage } from "@langchain/core/messages";
+import { AIMessage, HumanMessage, SystemMessage, ToolMessage } from "@langchain/core/messages";
 import { retrieveTool, webSearchTool, augmentToolNode, scrapeServiceContent, scrapeLinksFromHomePage } from "./graphTools";
 import { augmentationSystemPrompt, createTaskSummaryPrompt, filterServiceTitlesFromScrappedContentPrompt, filterServicesHomeLinkFromHomepagePrompt, filterLinkFromSearchPrompt, generateAdPrompt } from "@/system_prompts/system_prompts";
 import { toolsCondition } from "@langchain/langgraph/prebuilt";
-import { extractStringContent, handleModelError, toLangChainMessagesForAugmentation, toLangChainMessagesForCreation } from "@/utils/utils";
+import { extractStringContent, handleModelError, toBaseMessageForAugmentation, toBaseMessagesForAdGeneration, toBaseMessagesForSummary } from "@/utils/utils";
 import { Message } from "@/models/message.model";
 import type { BaseMessage, MessageContent } from "@langchain/core/messages";
 import { LargeLanguageModel } from "@/models/largeLanguageModel.model";
@@ -32,9 +32,14 @@ const searchSupporter = new ChatOpenAI({
 })
 
 const generateAdSchema = z.object({
-  adText: z.string().optional().describe("Sukurto reklamos teksto turinys"),
-  otherText: z.string().optional().describe("Bet koks kitas tekstas, kuris nėra reklamos turinys"),
+  adText: z.string().describe("Sukurto reklamos teksto turinys. Arba tuščia '' eilutė."),
+  otherText: z.string().describe("Bet koks kitas tekstas, kuris nėra reklamos turinys. Arba tuščia '' eilutė."),
 });
+
+// const taskSummarySchema = z.object({
+//   adText: z.string().describe("Sukurto reklamos teksto turinys"),
+//   otherText: z.string().describe("Bet koks kitas tekstas, kuris nėra reklamos turinys"),
+// });
 
 export const StateAnnotation = Annotation.Root({
   messages: Annotation<BaseMessage[]>({
@@ -179,17 +184,23 @@ function getModelInstance(
 async function createTaskSummary(state: typeof StateAnnotation.State, modelName: LargeLanguageModel): Promise<{ messages: AIMessage[] }> {
   console.log(`---createTaskSummary started for model ${modelName}`);
   try {
-    const llmInstance = getModelInstance(modelName, 0.2, 0.5);
+    const llmInstance = getModelInstance(modelName, 0.1, 0.9);
     const retrievalToolMessage = state.messages?.find((message) => message.name === "retrieve");
-    const initialUserMessage = state.messages?.find((message) => message instanceof HumanMessage);
+    const humanMessageList = state.messages?.filter((message) => message instanceof HumanMessage);
+    const lastHumanMessage = humanMessageList ? humanMessageList[humanMessageList.length - 1] : undefined;
 
     const retrievedContext = retrievalToolMessage ? extractStringContent(retrievalToolMessage.content) : '';
-    const initialUserPrompt = initialUserMessage ? extractStringContent(initialUserMessage.content) : '';
-    const { scrapedServiceContent, scrapedServices } = state;
+    const initialUserPrompt = lastHumanMessage ? extractStringContent(lastHumanMessage.content) : '';
+
+    const scrapedServiceContentMessage = state.messages?.find(message => message instanceof AIMessage && message.additional_kwargs?.custom_function === CustomFunction.ScrapedServiceContent);
+    const scrapedServiceContent = scrapedServiceContentMessage ? extractStringContent(scrapedServiceContentMessage.content) : '';
+
+    const scrapedServicesMessage = state.messages?.find(message => message instanceof AIMessage && message.additional_kwargs?.custom_function === CustomFunction.ScrapedServices);
+    const scrapedServices = scrapedServicesMessage ? extractStringContent(scrapedServicesMessage.content) : '';
 
     const prompt = [
       new SystemMessage(createTaskSummaryPrompt(initialUserPrompt, scrapedServiceContent, scrapedServices, retrievedContext)),
-      new HumanMessage("Prašau sukurti apibendrinamąjį straipsnį pagal pateiktą informaciją."),
+      new HumanMessage("Prašau sukurti apibendrintą užduotį reklamos sukūrimui pagal pateiktą informaciją."),
     ];
     const response = await llmInstance.invoke(prompt);
     response.additional_kwargs = {
@@ -221,14 +232,16 @@ async function generateAd(state: typeof StateAnnotation.State, modelName: LargeL
         message instanceof HumanMessage ||
         message instanceof SystemMessage ||
         (message instanceof AIMessage &&
-          message.tool_calls?.length === 0 &&
           message.additional_kwargs?.custom_function !== CustomFunction.CreateTaskSummary &&
+          message.additional_kwargs?.custom_function !== CustomFunction.ScrapedServiceContent &&
+          message.additional_kwargs?.custom_function !== CustomFunction.ScrapedServices &&
           !extractStringContent(message.content).includes("Failed to generate"))
     );
     const prompt = [
       new SystemMessage(generateAdPrompt(taskSummary)),
       ...conversationMessages
     ];
+
     const llmWithSchema = llmInstance.withStructuredOutput(generateAdSchema);
     const structuredResponse = await llmWithSchema.invoke(prompt);
 
@@ -283,7 +296,7 @@ function buildAugmentationGraph() {
   return graph.compile();
 }
 
-function buildCreationGraph(model: LargeLanguageModel, requiresAugmentation: boolean) {
+function buildCreationGraph(model: LargeLanguageModel, shouldRunTaskSummary: boolean) {
   const graph = new StateGraph(StateAnnotation);
 
   const modelId = model.toString();
@@ -291,7 +304,7 @@ function buildCreationGraph(model: LargeLanguageModel, requiresAugmentation: boo
   const taskSummaryNodeName: any = `createTaskSummary_${modelId}`;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const generateAdNodeName: any = `generateAd_${modelId}`;
-  if (requiresAugmentation) {
+  if (shouldRunTaskSummary) {
     graph
       .addNode(taskSummaryNodeName, (state) => createTaskSummary(state, model))
       .addNode(generateAdNodeName, (state) => generateAd(state, model))
@@ -310,13 +323,10 @@ function buildCreationGraph(model: LargeLanguageModel, requiresAugmentation: boo
 
 async function runAugmentationWorkflow(
   messages: Message[],
-  onStep: (step: StepStreamData) => void,
-  initialAugmentationRequired: boolean = false
-): Promise<{ augmentationRequired: boolean, terminatFurtherActions: boolean }> {
-  let augmentationRequired = initialAugmentationRequired;
-
+  onStep: (step: StepStreamData) => void
+): Promise<{ terminatFurtherActions: boolean, lastStep?: typeof StateAnnotation.State }> {
   const augmentationGraph = buildAugmentationGraph();
-  const langchainMessagesForAugmentation = toLangChainMessagesForAugmentation(messages);
+  const langchainMessagesForAugmentation = toBaseMessageForAugmentation(messages);
 
   let retrievalContent: string = '';
   let scrapedServiceContent: string = ''
@@ -328,23 +338,25 @@ async function runAugmentationWorkflow(
   try {
     if (rateLimitResponse) {
       onStep({ type: GraphStep.Error, content: rateLimitResponse.generatedContent });
-      return { augmentationRequired: false, terminatFurtherActions: true };
+      return { terminatFurtherActions: true };
     }
 
-    for await (const step of await augmentationGraph.stream({ messages: langchainMessagesForAugmentation }, { streamMode: "values" })) {
-      const retrieveMessage = step.messages?.find((message) => message.name === "retrieve");
+    const steps = [];
 
+    for await (const step of await augmentationGraph.stream({ messages: langchainMessagesForAugmentation }, { streamMode: "values" })) {
+      steps.push(step);
+
+      const retrieveMessage = step.messages?.find((message) => message.name === "retrieve");
       const errorMessage = step.messages?.find(message => message.additional_kwargs?.error === true);
 
       if (errorMessage) {
         onStep({ type: GraphStep.Error, content: extractStringContent(errorMessage.content) });
-        return { augmentationRequired: false, terminatFurtherActions: true };
+        return { terminatFurtherActions: true };
       }
 
       if (!retrievalContent && retrieveMessage) {
         retrievalContent = extractStringContent(retrieveMessage.content);
         onStep({ type: GraphStep.RetrievalContent, content: retrievalContent });
-        augmentationRequired = true;
       }
 
       if (!linksUsedForScraping && step.linksUsedForScraping?.length) {
@@ -362,14 +374,17 @@ async function runAugmentationWorkflow(
         onStep({ type: GraphStep.ScrapedServices, content: scrapedServices });
       }
     }
-    return { augmentationRequired, terminatFurtherActions: false };
+    const lastStep = steps[steps.length - 1];
+    return {
+      terminatFurtherActions: false,
+      lastStep
+    };
   } catch (error) {
     console.error("❌ Error in runAugmentationWorkflow:", error);
     onStep({ type: GraphStep.Error, content: `❌ Augmentation error: ${String(error)}\n\n` });
-    return { augmentationRequired: false, terminatFurtherActions: true };
+    return { terminatFurtherActions: true };
   }
 }
-
 
 function processStepMessages(
   step: typeof StateAnnotation.State,
@@ -428,23 +443,28 @@ function processStepMessages(
 }
 
 async function runCreationWorkflow(
-  messages: Message[],
+  state: typeof StateAnnotation.State,
+  frontendMessages: Message[],
   models: LargeLanguageModel[],
   onStep: (step: StepStreamData) => void,
-  initialAugmentationRequired: boolean = false
+  shouldRunTaskSummary: boolean = false,
 ): Promise<void> {
   const summaries: Record<string, string> = {};
   const generatedAds: Record<string, string> = {};
 
   await Promise.allSettled(
     models.map(async (model) => {
-      const creationGraph = buildCreationGraph(model, initialAugmentationRequired);
-      const langchainMessagesForCreation = toLangChainMessagesForCreation(messages, model);
+      const creationGraph = buildCreationGraph(model, shouldRunTaskSummary);
+      const frontendBaseMessages = toBaseMessagesForAdGeneration(frontendMessages, model);
+
+      const aiMessagesFromAugmentation = toBaseMessagesForSummary(state)
+      const combinedMessages = [
+        ...frontendBaseMessages,
+        ...aiMessagesFromAugmentation
+      ];
+
       try {
-        for await (const step of await creationGraph.stream(
-          { messages: langchainMessagesForCreation },
-          { streamMode: "values" }
-        )) {
+        for await (const step of await creationGraph.stream({ messages: combinedMessages }, { streamMode: "values" })) {
           processStepMessages(
             step,
             model,
@@ -470,10 +490,16 @@ export async function runWorkflow(
   models: LargeLanguageModel[],
   onStep: (step: StepStreamData) => void
 ): Promise<void> {
-  const response = await runAugmentationWorkflow(messages, onStep, false);
-  if (response.terminatFurtherActions) {
+
+  const response = await runAugmentationWorkflow(messages, onStep);
+  if (!response.lastStep || response.terminatFurtherActions) {
+    console.log("❌ runWorkflow - Augmentation workflow terminated early.");
     return
   }
 
-  await runCreationWorkflow(messages, models, onStep, response.augmentationRequired);
+  const shouldRunTaskSummary = !!response.lastStep.scrapedServiceContent ||
+    !!response.lastStep.scrapedServices ||
+    !!response.lastStep.messages.some(msg => (msg instanceof ToolMessage && msg.name === "retrieve"))
+
+  await runCreationWorkflow(response.lastStep, messages, models, onStep, shouldRunTaskSummary);
 }
