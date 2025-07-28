@@ -9,7 +9,6 @@
     "start": "next start",
     "lint": "next lint",
     "preload-kb": "npm run file src/services/knowledgeBase.ts",
-    "test-chat": "npm run file src/services/langchain.ts",
     "file": "tsx --env-file=.env.local --no-deprecation"
   },
   "dependencies": {

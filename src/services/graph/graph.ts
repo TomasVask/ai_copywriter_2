@@ -36,11 +36,6 @@ const generateAdSchema = z.object({
   otherText: z.string().describe("Bet koks kitas tekstas, kuris nėra reklamos turinys. Arba tuščia '' eilutė."),
 });
 
-// const taskSummarySchema = z.object({
-//   adText: z.string().describe("Sukurto reklamos teksto turinys"),
-//   otherText: z.string().describe("Bet koks kitas tekstas, kuris nėra reklamos turinys"),
-// });
-
 export const StateAnnotation = Annotation.Root({
   messages: Annotation<BaseMessage[]>({
     reducer: (x, y) => x.concat(y),
