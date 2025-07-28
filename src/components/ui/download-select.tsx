@@ -37,7 +37,7 @@ export const DownloadSelect = ({ session }: DownloadSelectProps) => {
             'assistant',
             modelResponse.model,
             message.timestamp ? new Date(message.timestamp).toLocaleString() : '',
-            escapeCSV(String(modelResponse.content || ''))
+            escapeCSV(String(modelResponse.generatedContent || ''))
           ]);
         }
         return [];
@@ -101,7 +101,7 @@ export const DownloadSelect = ({ session }: DownloadSelectProps) => {
           const header = `ASSISTANT [${modelResponse.model}] (${message.timestamp ? new Date(message.timestamp).toLocaleString() : ''}):`;
           const { y: yAfterHeader } = addTextBlock(header, y);
           y = yAfterHeader + spaceBelowHeading; // Add small space below heading
-          const { y: yAfterContent } = addTextBlock(String(modelResponse.content || ''), y);
+          const { y: yAfterContent } = addTextBlock(String(modelResponse.generatedContent || ''), y);
           y = yAfterContent + 2; // small space after content
         });
       }
