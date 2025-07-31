@@ -43,7 +43,19 @@ export const retrieveTool = tool(
     );
     const companyFilter = foundCompany ? { company: foundCompany } : undefined;
     const retrievedDocs = await vectorStore.similaritySearch(query, 4, companyFilter);
-    const serialized = retrievedDocs
+
+    // Filter out duplicates by pageContent (or use another unique property if needed)
+    const uniqueDocs = [];
+    const seenContents = new Set<string>();
+    for (const doc of retrievedDocs) {
+      if (!seenContents.has(doc.pageContent)) {
+        uniqueDocs.push(doc);
+        seenContents.add(doc.pageContent);
+      }
+      if (uniqueDocs.length >= 4) break;
+    }
+
+    const serialized = uniqueDocs
       .map((doc, index) => `
     Reklama: ${index + 1}
     Turinys: ${doc.pageContent}
@@ -51,7 +63,7 @@ export const retrieveTool = tool(
     `).join("\n");
 
     console.log('RETRIEVE completed')
-    return [serialized, retrievedDocs];
+    return [serialized, uniqueDocs];
   },
   {
     name: "retrieve",

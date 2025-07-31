@@ -132,8 +132,8 @@ export const generateAdPrompt = (taskSummary: string) =>
   `❗NEGALIMA su reklama NESUSIJUSIO turinio talpinti į "adText" objekto savybę. Pavyzdžiui, jeigu užklausa yra "Labas, papasakok apie save", bet kokį sugeneruotą atsakymą talpink tik į "otherText" objekto savybę.\n\n` +
   `⚠️ Atsakymą gražink JSON formatu:\n` +
   `{\n` +
-  `  "adText": "<Tavo reklamos tekstas čia> | ''",\n` +
-  `  "otherText": "<Kitas tekstas, kuris nėra reklama> | ''"\n` +
+  `  "adText": "<Tavo reklamos tekstas čia>",\n` +
+  `  "otherText": "<Kitas tekstas, kuris nėra reklama>"\n` +
   `}\n`;
 
 

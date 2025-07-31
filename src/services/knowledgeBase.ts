@@ -20,7 +20,7 @@ export const vectorStore = new Chroma(embeddings, {
 });
 
 const splitter = new RecursiveCharacterTextSplitter({
-  chunkSize: 350,
+  chunkSize: 1300,
   chunkOverlap: 40,
   separators: ["\n\n", "\n", ". ", " ", ""],
 });
@@ -80,7 +80,7 @@ async function getSplittedDocuments(): Promise<LangChainDocument[]> {
 
     for (const ad of ads) {
       const sanitizedAdWithMetadata = sanitizeAd(ad, baseMeta.company, baseMeta.filename);
-      if (sanitizedAdWithMetadata.pageContent.length > 500) {
+      if (sanitizedAdWithMetadata.pageContent.length > 1200) {
         const subChunks = await splitter.splitDocuments([sanitizedAdWithMetadata]);
         subChunks.forEach(chunk => {
           if (chunk.metadata.loc) {
@@ -108,4 +108,4 @@ export async function loadKnowledgeBase() {
   }
 }
 
-// loadKnowledgeBase()
+loadKnowledgeBase()
